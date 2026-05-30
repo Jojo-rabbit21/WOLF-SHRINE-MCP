@@ -137,7 +137,7 @@ server.setRequestHandler(
   }
 );
 
-// 【防崩溃核心 1】：强制将所有请求体的 Content-Type 视作 JSON 进行解析
+// 强制解析请求体
 app.use(express.json({ type: '*/*' }));
 
 let transport;
@@ -153,18 +153,18 @@ app.get("/sse", async (req, res) => {
   }
 });
 
-// 【防崩溃核心 2】：加上强大的捕获兜底，防止不规范请求导致服务自杀
 app.post("/messages", async (req, res) => {
   try {
     if (transport) {
-      await transport.handleMessage(req, res);
+      // 【终极修复】：只传递 req.body (信件内容)，并用 res.status(200).end() 优雅地结束请求
+      await transport.handleMessage(req.body);
+      res.status(200).end();
     } else {
       console.warn("【警告】收到消息，但没有活跃的 SSE 会话");
       res.status(400).send("No active SSE session");
     }
   } catch (err) {
     console.error("【消息处理异常（已安全拦截）】:", err);
-    // 返回 200 或 400，但绝不崩溃
     res.status(400).send(`Invalid message format: ${err.message}`);
   }
 });
