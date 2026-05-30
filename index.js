@@ -2,6 +2,7 @@ import express from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -27,9 +28,9 @@ const server = new Server(
   }
 );
 
-// 注册工具：存储与检索
+// 注册工具列表 (已修复：使用官方 Schema)
 server.setRequestHandler(
-  "tools/list",
+  ListToolsRequestSchema,
   async () => ({
     tools: [
       {
@@ -80,9 +81,9 @@ async function ensureCollection() {
     }
 }
 
-// 处理工具调用
+// 处理工具调用 (已修复：使用官方 Schema)
 server.setRequestHandler(
-  "tools/call",
+  CallToolRequestSchema,
   async (request) => {
     await ensureCollection();
     const { name, arguments: args } = request.params;
