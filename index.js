@@ -60,22 +60,34 @@ server.setRequestHandler(
   })
 );
 
-// 确保 Qdrant 集合存在
+// 【升级：自愈型集合与索引检查】
 async function ensureCollection() {
     try {
         const collections = await qdrant.getCollections();
         const exists = collections.collections.some(c => c.name === collectionName);
+        
         if (!exists) {
+            console.log("【Qdrant】集合不存在，正在创建...");
             await qdrant.createCollection(collectionName, {
                 vectors: { size: 1, distance: "Cosine" }
             });
+        }
+
+        // 强行尝试建立全文检索索引，如果已经有了，Qdrant 会安全忽略，如果没有，会自动补齐！
+        try {
+            console.log("【Qdrant】正在确保全文检索索引存在...");
             await qdrant.createPayloadIndex(collectionName, {
                 field_name: "content",
                 field_schema: "text"
             });
+            console.log("【Qdrant】全文检索索引已就绪。");
+        } catch (indexErr) {
+            // 索引已存在时忽略报错
+            console.log("【Qdrant】全文检索索引已存在，跳过。");
         }
+        
     } catch (e) {
-        console.error("【Qdrant 警告】初始化集合异常:", e);
+        console.error("【Qdrant 警告】初始化集合或索引异常:", e);
     }
 }
 
@@ -156,15 +168,14 @@ app.get("/sse", async (req, res) => {
 app.post("/messages", async (req, res) => {
   try {
     if (transport) {
-      // 【终极修复】：只传递 req.body (信件内容)，并用 res.status(200).end() 优雅地结束请求
       await transport.handleMessage(req.body);
       res.status(200).end();
     } else {
-      console.warn("【警告】收到消息，但没有活跃的 SSE 会话");
+      console.warn("【警告】收到消息，但没有活跃性 SSE 会话");
       res.status(400).send("No active SSE session");
     }
   } catch (err) {
-    console.error("【消息处理异常（已安全拦截）】:", err);
+    console.error("【消息处理异常】:", err);
     res.status(400).send(`Invalid message format: ${err.message}`);
   }
 });
